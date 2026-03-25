@@ -1,0 +1,18 @@
+# 暫存與輸出
+tmp/
+output/
+logs/
+
+# 音訊參考檔（太大）
+data/ref_voices/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 環境變數
+.env
+.env.*
+.ipynb_checkpoints/
+*.log
