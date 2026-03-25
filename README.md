@@ -128,7 +128,7 @@ Bot 上線後在任意頻道使用：
 | `!start` | 啟動生產線 |
 | `!stop` | 停止生產線 |
 | `!log [行數]` | 查看最新 log（預設 15 行） |
-| `!topic 主題名稱` | 觸發指定主題生產 |
+| `!topic 主題名稱` | 觸發指定主題生產（完成後自動推播通知） |
 | `!queue` | 查看已完成主題列表（含品質標記） |
 | `!remove <主題名稱>` | 從已完成清單移除指定主題 |
 | `!help` | 顯示指令列表 |
@@ -200,4 +200,3 @@ Bot 上線後在任意頻道使用：
 
 - 配音升級：ElevenLabs 或 Azure Neural TTS
 - 自動上傳 YouTube（YouTube Data API）
-- Discord `!topic` 進度推播（生產完成後自動通知）

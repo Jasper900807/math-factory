@@ -3,6 +3,7 @@
 Math Factory Discord Bot
 指令：!status, !start, !stop, !log, !topic <主題>, !queue
 """
+import asyncio
 import os
 import subprocess
 import discord
@@ -16,7 +17,9 @@ VENV_PYTHON = "/home/ubuntu/.venv/bin/python"
 WATCHER_SCRIPT = f"{WORK_DIR}/scripts/sandbox_watcher.sh"
 PRODUCER_SCRIPT = f"{WORK_DIR}/scripts/auto_producer.sh"
 PRODUCER_LOG = f"{WORK_DIR}/logs/auto_producer.log"
+WATCHER_LOG = f"{WORK_DIR}/logs/watcher.log"
 DONE_FILE = f"{WORK_DIR}/data/topics_done.txt"
+TOPIC_TIMEOUT_MIN = 40
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -99,6 +102,49 @@ async def cmd_log(ctx, lines: int = 15):
     await ctx.send(f"```\n{log}\n```")
 
 
+async def _watch_production(channel: discord.TextChannel, topic: str):
+    """背景任務：輪詢 watcher.log，生產完成時推播通知。"""
+    # 以觸發前的行數為基準，只看新增的行
+    try:
+        with open(WATCHER_LOG, encoding="utf-8") as f:
+            baseline = sum(1 for _ in f)
+    except FileNotFoundError:
+        baseline = 0
+
+    deadline = asyncio.get_event_loop().time() + TOPIC_TIMEOUT_MIN * 60
+
+    while asyncio.get_event_loop().time() < deadline:
+        await asyncio.sleep(15)
+        try:
+            with open(WATCHER_LOG, encoding="utf-8") as f:
+                new_lines = f.readlines()[baseline:]
+        except FileNotFoundError:
+            continue
+
+        new_text = "".join(new_lines)
+
+        if "factory_v4.py done" in new_text:
+            quality_match = next(
+                (l for l in new_lines if "[QUALITY]" in l), ""
+            )
+            quality = quality_match.split("[QUALITY]")[-1].strip() if quality_match else "ok"
+            icon = QUALITY_ICON.get(quality, "✅")
+            embed = discord.Embed(
+                title=f"{icon} 影片生產完成",
+                description=f"**{topic}**",
+                color=0x00ff99 if quality == "ok" else 0xffa500,
+            )
+            embed.set_footer(text=f"品質：{quality}")
+            await channel.send(embed=embed)
+            return
+
+        if "factory_v4.py FAILED" in new_text:
+            await channel.send(f"❌ **{topic}** 生產失敗，請用 `!log` 查看原因")
+            return
+
+    await channel.send(f"⏱️ **{topic}** 等待逾時（{TOPIC_TIMEOUT_MIN} 分鐘），請用 `!log` 確認狀態")
+
+
 @bot.command(name="topic")
 async def cmd_topic(ctx, *, topic: str):
     if not topic:
@@ -117,7 +163,10 @@ async def cmd_topic(ctx, *, topic: str):
         f"ssh openshell-my-assistant 'rm -f /sandbox/trigger.txt' 2>/dev/null; "
         f"openshell sandbox upload my-assistant {tmp} /sandbox/trigger.txt"
     )
-    await ctx.send(f"✅ 已觸發！等待生產完成...\n```{result[:200]}```")
+    await ctx.send(f"✅ 已觸發！生產完成後會自動通知\n```{result[:200]}```")
+
+    # 啟動背景監控
+    asyncio.create_task(_watch_production(ctx.channel, topic))
 
 
 QUALITY_ICON = {"ok": "✅", "fallback": "⚠️", "failed": "❌", "timeout": "⏱️"}
