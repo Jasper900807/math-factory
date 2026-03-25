@@ -120,17 +120,66 @@ async def cmd_topic(ctx, *, topic: str):
     await ctx.send(f"✅ 已觸發！等待生產完成...\n```{result[:200]}```")
 
 
+QUALITY_ICON = {"ok": "✅", "fallback": "⚠️", "failed": "❌", "timeout": "⏱️"}
+
 @bot.command(name="queue")
 async def cmd_queue(ctx):
     if not os.path.exists(DONE_FILE):
         await ctx.send("📋 尚無已完成主題")
         return
-    with open(DONE_FILE) as f:
-        topics = [l.strip() for l in f if l.strip()]
-    recent = topics[-20:]
-    text = "\n".join(f"{i+1}. {t}" for i, t in enumerate(recent))
-    embed = discord.Embed(title=f"📋 已完成主題（最近 {len(recent)} 個）", description=text, color=0x00ff99)
+    with open(DONE_FILE, encoding="utf-8") as f:
+        lines = [l.strip() for l in f if l.strip()]
+    recent = lines[-20:]
+
+    rows = []
+    ok_count = fallback_count = failed_count = 0
+    for i, line in enumerate(recent):
+        parts = line.split("|")
+        topic = parts[0]
+        quality = parts[1] if len(parts) > 1 else "ok"
+        icon = QUALITY_ICON.get(quality, "✅")
+        rows.append(f"{icon} {i+1}. {topic}")
+        if quality == "ok": ok_count += 1
+        elif quality == "fallback": fallback_count += 1
+        else: failed_count += 1
+
+    text = "\n".join(rows)
+    stats = f"✅ {ok_count}  ⚠️ {fallback_count}  ❌ {failed_count}"
+    embed = discord.Embed(
+        title=f"📋 已完成主題（最近 {len(recent)} 個）",
+        description=text,
+        color=0x00ff99
+    )
+    embed.set_footer(text=stats)
     await ctx.send(embed=embed)
+
+
+@bot.command(name="remove")
+async def cmd_remove(ctx, *, topic: str = ""):
+    if not topic:
+        await ctx.send("用法：`!remove 主題名稱`")
+        return
+
+    if not os.path.exists(DONE_FILE):
+        await ctx.send("⚠️ 清單檔案不存在")
+        return
+
+    with open(DONE_FILE, encoding="utf-8") as f:
+        lines = f.readlines()
+
+    kept = [l for l in lines if not (
+        l.strip() == topic or l.strip().startswith(topic + "|")
+    )]
+    removed = len(lines) - len(kept)
+
+    if removed == 0:
+        await ctx.send(f"⚠️ 找不到：**{topic}**")
+        return
+
+    with open(DONE_FILE, "w", encoding="utf-8") as f:
+        f.writelines(kept)
+
+    await ctx.send(f"✅ 已從清單移除：**{topic}**")
 
 
 @bot.command(name="help")
@@ -141,7 +190,8 @@ async def cmd_help(ctx):
     embed.add_field(name="!stop", value="停止生產線", inline=False)
     embed.add_field(name="!log [行數]", value="查看最新 log（預設 15 行）", inline=False)
     embed.add_field(name="!topic <主題>", value="觸發特定主題生產", inline=False)
-    embed.add_field(name="!queue", value="查看已完成主題列表", inline=False)
+    embed.add_field(name="!queue", value="查看已完成主題列表（含品質標記）", inline=False)
+    embed.add_field(name="!remove <主題>", value="從已完成清單移除指定主題", inline=False)
     await ctx.send(embed=embed)
 
 

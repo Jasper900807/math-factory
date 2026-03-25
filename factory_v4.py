@@ -1017,6 +1017,7 @@ def render_manim_with_retry(timeline: list, topic: str, quality: str = "h") -> s
             mp4 = _find_output_mp4(combined)
             if mp4:
                 print(f"  ✅ 渲染成功：{mp4}")
+                print("[QUALITY] ok")
                 return mp4
 
         # 完整錯誤（去 ANSI，取最後 2500 字）
@@ -1038,8 +1039,12 @@ def render_manim_with_retry(timeline: list, topic: str, quality: str = "h") -> s
                 break
         error_msg = f"{loc_line}\n{key_err}".strip() if loc_line else key_err
 
-    print("\n  ❌ 全部重試失敗，停止執行")
+    print("\n  ❌ 全部重試失敗，改用備用模板...")
     print("  診斷檔：math_short_attempt1.py / attempt2.py / attempt3.py")
+    fallback_mp4 = render_fallback(timeline, quality)
+    if fallback_mp4:
+        print("[QUALITY] fallback")
+        return fallback_mp4
     raise SystemExit(1)
 
 

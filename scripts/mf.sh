@@ -43,6 +43,7 @@ case "$1" in
       echo "Bot 已在運行中"
       exit 0
     fi
+    source ~/.bashrc 2>/dev/null || true
     nohup "$VENV_PYTHON" "$BOT" >> "$BOT_LOG" 2>&1 &
     echo "✅ Discord Bot 已啟動（PID $!，log: $BOT_LOG）"
     ;;
@@ -57,8 +58,25 @@ case "$1" in
     > "$WORK_DIR/data/topics_done.txt"
     echo "✅ 已清除 $COUNT 筆主題紀錄"
     ;;
+  remove-topic)
+    if [[ -z "${2:-}" ]]; then
+      echo "用法：$0 remove-topic <主題名稱>"
+      exit 1
+    fi
+    TOPIC="$2"
+    FILE="$WORK_DIR/data/topics_done.txt"
+    BEFORE=$(wc -l < "$FILE" 2>/dev/null || echo 0)
+    grep -v "^${TOPIC}|" "$FILE" | grep -v "^${TOPIC}$" > "${FILE}.tmp" && mv "${FILE}.tmp" "$FILE"
+    AFTER=$(wc -l < "$FILE")
+    REMOVED=$(( BEFORE - AFTER ))
+    if [[ "$REMOVED" -gt 0 ]]; then
+      echo "✅ 已移除：$TOPIC（$REMOVED 筆）"
+    else
+      echo "⚠️ 找不到：$TOPIC"
+    fi
+    ;;
   *)
-    echo "用法：$0 start | stop | status | log | bot | bot-stop | bot-log | clear-topics"
+    echo "用法：$0 start | stop | status | log | bot | bot-stop | bot-log | clear-topics | remove-topic <主題>"
     exit 1
     ;;
 esac

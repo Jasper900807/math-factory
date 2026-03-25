@@ -59,15 +59,19 @@ while true; do
     done
 
     if [[ "$STATUS" == "done" ]]; then
-        log "  ✅ 影片生產完成"
+        # 解析品質標記（[QUALITY] ok / fallback）
+        QUALITY=$(tail -n +"$BASELINE" "$WATCHER_LOG" 2>/dev/null \
+            | grep -o '\[QUALITY\] [a-z]*' | tail -1 | awk '{print $2}')
+        QUALITY="${QUALITY:-ok}"
+        log "  ✅ 影片生產完成（品質：$QUALITY）"
     elif [[ "$STATUS" == "failed" ]]; then
         log "  ⚠️ factory_v4.py 失敗，跳過上傳，繼續下一個主題"
-        echo "$TOPIC" >> "$DONE_FILE"
+        echo "$TOPIC|failed|$(date +%F)" >> "$DONE_FILE"
         sleep 5
         continue
     else
         log "  ⚠️ 逾時（${TIMEOUT_MIN} 分鐘），跳過，繼續下一個主題"
-        echo "$TOPIC" >> "$DONE_FILE"
+        echo "$TOPIC|timeout|$(date +%F)" >> "$DONE_FILE"
         sleep 5
         continue
     fi
@@ -87,8 +91,8 @@ while true; do
         log "  ⚠️ 找不到影片檔"
     fi
 
-    # 記錄已完成主題
-    echo "$TOPIC" >> "$DONE_FILE"
+    # 記錄已完成主題（含品質與日期）
+    echo "$TOPIC|$QUALITY|$(date +%F)" >> "$DONE_FILE"
 
     log "====== 完成一支，立刻開始下一支 ======"
     sleep 3
