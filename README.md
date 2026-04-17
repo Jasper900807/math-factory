@@ -7,18 +7,15 @@
 ## 系統概覽
 
 ```
-auto_producer.sh
+auto_producer.sh（無限迴圈）
     ├── generate_topic.py → Gemini 自動選題（熱門 / 深度 交替）
-    └── 寫入 NemoClaw sandbox trigger.txt
-sandbox_watcher.sh（每 5 秒輪詢）
-    ↓ 偵測到 trigger，觸發生產
-factory_v4.py（主程式）
-    ├── Gemini 2.5 Flash → 旁白腳本（6段結構）
-    ├── edge-tts → 分段配音
-    ├── Gemini 2.5 Flash → Manim 動畫程式碼（AST 驗證，最多重試3次）
-    ├── Manim → 數學動畫渲染（1080×1920），失敗自動降級備用模板
-    └── FFmpeg → 合併影片 + 字幕燒入
-    ↓ 輸出品質標記（ok / fallback）
+    └── factory_v4.py（直接執行）
+            ├── Gemini 2.5 Flash → 旁白腳本（6段結構）
+            ├── F5-TTS → 分段配音
+            ├── Gemini 2.5 Flash → Manim 動畫程式碼（AST 驗證，最多重試3次）
+            ├── Manim → 數學動畫渲染（1080×1920），失敗自動降級備用模板
+            └── FFmpeg → 合併影片 + 字幕燒入
+            ↓ 輸出品質標記（ok / fallback）
 auto_producer.sh
     ├── rclone → 上傳 Google Drive
     └── 記錄 data/topics_done.txt（含品質與日期）
@@ -35,8 +32,7 @@ math-factory/
 ├── upload_gdrive.py      # Google Drive 上傳（rclone）
 ├── scripts/
 │   ├── mf.sh             # 控制腳本（start/stop/status/bot）
-│   ├── auto_producer.sh  # 無限生產迴圈
-│   └── sandbox_watcher.sh  # NemoClaw trigger 監聽
+│   └── auto_producer.sh  # 無限生產迴圈
 ├── bot/
 │   └── discord_bot.py    # Discord 遠端控制 Bot
 ├── logs/                 # 執行日誌
@@ -52,31 +48,6 @@ math-factory/
 
 ---
 
-## NemoClaw 在系統中的角色
-
-NemoClaw 是 NVIDIA 提供的 AI Agent 沙箱平台。在本系統中作為**遠端觸發橋樑**：
-
-```
-使用者（任何裝置）
-    ↓ openshell 指令
-NemoClaw Sandbox（my-assistant）
-    ↓ 寫入 /sandbox/trigger.txt
-sandbox_watcher.sh（每 5 秒輪詢）
-    ↓ 偵測到 trigger，讀取主題
-factory_v4.py 開始生產
-```
-
-**為何需要 NemoClaw？**
-
-Brev 機器沒有固定公開 IP，無法直接接收外部 webhook。NemoClaw Sandbox 提供一個雙方都能存取的共享檔案空間（`/sandbox/`），本機透過 `openshell` 工具輪詢這個空間，實現無需固定 IP 的遠端觸發。
-
-**沙箱設定（`my-assistant`）：**
-- 模型：Gemini 2.5 Flash
-- Policy：`math-factory`（允許存取 Gemini API、edge-tts）
-- 觸發檔案：`/sandbox/trigger.txt`（內容為主題文字）
-
----
-
 ## 快速操作
 
 ### 環境需求
@@ -89,7 +60,7 @@ export DISCORD_BOT_TOKEN="..."   # 寫入 ~/.bashrc
 ### 啟動 / 停止生產線
 
 ```bash
-mf start          # 啟動 sandbox_watcher + auto_producer
+mf start          # 啟動 auto_producer
 mf stop           # 停止生產線
 mf status         # 查看運行狀態
 mf log            # 即時查看 log（Ctrl+C 離開）
@@ -110,10 +81,8 @@ mf bot-log    # 查看 Bot log
 ```bash
 # 直接執行
 TOPIC="黎曼假設" /home/ubuntu/.venv/bin/python factory_v4.py
-
-# 或透過 NemoClaw 沙箱觸發
-echo "黎曼假設" > /tmp/t.txt
-openshell sandbox upload my-assistant /tmp/t.txt /sandbox/trigger.txt
+# 或使用 --topic 參數
+/home/ubuntu/.venv/bin/python factory_v4.py --topic "黎曼假設"
 ```
 
 ---
@@ -147,10 +116,9 @@ Bot 上線後在任意頻道使用：
 - 6 段結構：Hook → 直覺挑戰 → 核心概念 → 驚人數字 → 生活連結 → CTA
 - 每段約 10 秒，總長 60 秒
 
-### 3. 配音（edge-tts）
-- 按句拆分，asyncio 並行生成所有片段
+### 3. 配音（F5-TTS）
+- 按句拆分，依序生成所有片段
 - 合併為完整 `voiceover.mp3`，同時建立時間軸
-- 503 錯誤自動重試 5 次
 
 ### 4. 動畫（Manim）
 - Gemini 針對每個時間段生成對應的 Manim snippet
@@ -186,12 +154,12 @@ Bot 上線後在任意頻道使用：
 
 | 項目 | 內容 |
 |------|------|
-| 機器 | Brev `youtube-factory` |
-| GPU | NVIDIA T4 16GB |
+| 機器 | gcloud VM |
+| GPU | NVIDIA T4 16GB（或其他 GPU） |
 | OS | Ubuntu 22.04 |
 | Python | 3.12（`/home/ubuntu/.venv`） |
 | 主要 API | Gemini 2.5 Flash |
-| TTS | edge-tts（Microsoft Azure Neural） |
+| TTS | F5-TTS |
 | 雲端儲存 | Google Drive（rclone OAuth2） |
 
 ---

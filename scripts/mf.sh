@@ -3,10 +3,8 @@
 # 用法：mf.sh start | stop | status | log
 
 WORK_DIR="/home/ubuntu/math-factory"
-WATCHER="$WORK_DIR/scripts/sandbox_watcher.sh"
 PRODUCER="$WORK_DIR/scripts/auto_producer.sh"
 BOT="$WORK_DIR/bot/discord_bot.py"
-WATCHER_LOG="$WORK_DIR/logs/watcher.log"
 PRODUCER_LOG="$WORK_DIR/logs/auto_producer.log"
 BOT_LOG="$WORK_DIR/logs/discord_bot.log"
 VENV_PYTHON="/home/ubuntu/.venv/bin/python"
@@ -19,17 +17,16 @@ case "$1" in
       echo "已經在運行中"
       exit 0
     fi
-    nohup bash "$WATCHER" >> "$WATCHER_LOG" 2>&1 &
     nohup bash "$PRODUCER" >> "$PRODUCER_LOG" 2>&1 &
-    echo "✅ 已啟動（watcher + producer）"
+    echo "✅ 已啟動（auto_producer）"
     ;;
   stop)
     pkill -f "bash.*auto_producer.sh" 2>/dev/null && echo "✅ auto_producer 已停止" || echo "auto_producer 未在運行"
-    pkill -f "bash.*sandbox_watcher.sh" 2>/dev/null && echo "✅ sandbox_watcher 已停止" || echo "sandbox_watcher 未在運行"
+    pkill -f "python.*factory_v4" 2>/dev/null && echo "✅ 進行中的生產已中止" || true
     ;;
   status)
     echo "=== 運行狀態 ==="
-    pgrep -af "bash.*(auto_producer|sandbox_watcher).sh" | grep -v grep || echo "（未在運行）"
+    pgrep -af "bash.*auto_producer.sh" | grep -v grep || echo "（未在運行）"
     pgrep -af "python.*discord_bot" | grep -v grep || true
     echo ""
     echo "=== 最新進度 ==="
